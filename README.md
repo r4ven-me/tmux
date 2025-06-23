@@ -86,8 +86,6 @@ Where:
 - `-s`– key for specifying the session name;
 - `Work`– arbitrary session name.
 
-[![](https://r4ven.me/wp-content/uploads/2024/11/image-47.png)](https://r4ven.me/wp-content/uploads/2024/11/image-47.png)
-
 It should look something like this:
 
 [![](https://r4ven.me/wp-content/uploads/2024/11/image-48.png)](https://r4ven.me/wp-content/uploads/2024/11/image-48.png)
@@ -168,7 +166,7 @@ Now you can connect to an existing session named **Work** using a single letter 
 
 **Keyboard shortcuts🎹:**
 
-Some keyboard shortcuts have been slightly expanded. For more details, see below: [Item 6. Custom Tmux hotkeys](https://r4ven.me/it-razdel/poleznoe-po/tmux-ustanovka-i-kastomizaciya-nord-theme/#%D0%9A%D0%B0%D1%81%D1%82%D0%BE%D0%BC%D0%BD%D1%8B%D0%B5_%D0%B3%D0%BE%D1%80%D1%8F%D1%87%D0%B8%D0%B5_%D0%BA%D0%BB%D0%B0%D0%B2%D0%B8%D1%88%D0%B8_Tmux) .
+Some keyboard shortcuts have been slightly expanded. For more details, see below: "Item 6. Custom Tmux hotkeys".
 
 **List of plugins📋:**
 
