@@ -1,0 +1,63 @@
+[ps tree] ps -axf -eo user,pid,ppid,state,comm
+[ps zombie] ps -eo user,pid,ppid,state,comm | awk '\$4=="Z" {print \$3}'
+[ps parrent] ps -o pid,command --ppid 698"
+[ps top5 cpu] ps --sort=-%cpu -eo user,pid,ppid,state,comm | head -n6
+[ps top5 mem] ps --sort=-%mem -eo user,pid,ppid,state,comm | head -n6
+[pstree] pstree -p -t -n -C age
+[ps systemd] systemd-cgls
+[cron add] { crontab -l; echo "0 3 * * 0 ls -l &> dirs.txt"; } | crontab -
+[du top20] du -h / 2> /dev/null | sort -rh | head -n 20
+[df 80] df -h | awk '\$5 ~ /^8[0-9]%/ {print \$6}'
+[git init] git init --initial-branch=main && git config user.name "User Name" && git config --global user.email "user@example.com" && git remote add origin ssh://git@github.com/user/reponame.git
+[journal vacuum] journalctl --vacuum-size=800M
+[lsof opened] lsof +D /opt
+[ossl connect] openssl s_client -connect github.com:443
+[ossl cert] openssl s_client -connect github.com:443 < /dev/null 2> /dev/null | openssl x509 -text
+[ossl info] openssl x509 -in ./ca-cert.pem -text -noout
+[ossl encrypt tar] tar -czf - /var/log/apt | openssl enc -aes-256-cbc -pbkdf2 -e -out ./logs.tar.gz.enc
+[ossl decrypt file] openssl enc -aes-256-cbc -pbkdf2 -d -in ./logs.tar.gz.enc -out ./logs.tar.gz
+[ss listen] ss -tuln | awk '{print \$5}' | grep -Eo ':[0-9]+$' | sort -t: -k2 -n -u
+[ipt recent icmp1] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --set --name PING_LIST
+[ipt recent icmp2] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --update --seconds 10 --hitcount 5 --name PING_LIST -j DROP
+[uptime unix] date -d "$(uptime -s)" +%s
+[history top10] history | awk '{print \$2}' | sort | uniq -c | sort -rn | head
+[urandom str] cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1
+[sed replace] sed -i.bak 's/old_text/new_text/g' file.txt
+[find chmod d] find /path -type f -exec chmod 644 {} \\;
+[find chmod f] find /path -type d -exec chmod 755 {} \\;
+[tcpdump dhost_dport] tcpdump -i any -nn -q dst host 10.11.12.13 and dst port 443
+[tcpdump stout] sudo tcpdump -nn -i any host 10.11.12.13 >> ./tcpdump.txt
+[tcpdump wrtie pacp] sudo tcpdump -nn -i any host 10.11.12.13 -w ./tcpdump.pcap
+[tcpdump read pcap] sudo tcpdump -qns 0 -X -r ./tcpdump.pcap | less
+[nmap check tport] nmap 10.11.12.13 -p 22
+[nmap check uport] nmap -sU 10.11.12.13 -p 53
+[asciinema record] asciinema rec demo.cast
+[asciinema gif] agg demo.cast first.gif --theme nord --font-family 'Hack Nerd Font Mono' --line-height 1.3 --font-size 18
+[docker network] docker network create --opt com.docker.network.bridge.name=br-monitoring --opt com.docker.network.enable_ipv6=false --driver bridge --subnet 172.22.23.0/24 --gateway 172.22.23.1 monitoring_network
+[docker multitool] docker run --rm -it --network=container:<container_name> --pid container:<container_name> wbitt/network-multitool:alpine-extra bash
+[docker build] docker build -t test/test .
+[docker build_multi] docker buildx create --use && docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t test/test:1.0 .
+[dig] dig github.com +short +answer +identify
+[dig2] dig @8.8.8.8 github.com +short +answer +identify
+[icmp ignore] echo 1 | sudo tee /proc/sys/net/ipv4/icmp_echo_ignore_all
+[ufw log] sudo dmesg -w | grep -i '\[UFW'
+[strace exec] strace -f -e execve ls -l
+[strace pid] strace -p <pid>
+[swap procs] for file in /proc/*/status ; do awk '/VmSwap|Name/{printf \$2 \" \" \$3}END{ print \"\"}' \$file; done | sort -k 2 -n -r | head -n 10
+[swappiness] cat /proc/sys/vm/swappiness
+[system group] addgroup --system --gid 1999 username
+[system user] adduser --system --gecos 'Example service user' --disabled-password --uid 1999 --ingroup username --shell /sbin/nologin --home /opt/username/ username
+[systemd unit] systemctl edit --full --force unitname.service
+[gpg encrypt] gpg --batch --passphrase-file /path/to/password_file --symmetric --cipher-algo AES256 example.txt
+[git push] git add . && git commit -m 'upd' && git push
+[sysrq reboot] echo b > /proc/sysrq-trigger
+[sysrq help] echo h | sudo tee /proc/sysrq-trigger | grep 'sysrq: HELP' /var/log/kern.log
+[oom score] printf "PID\tOOM Score\tOOM Adj\tCommand\n"; while read -r pid comm; do [ -f /proc/$pid/oom_score ] && [ $(cat /proc/$pid/oom_score) != 0 ] && printf "%d\t%d\t\t%d\t%s\n" "$pid" "$(cat /proc/$pid/oom_score)" "$(cat /proc/$pid/oom_score_adj)" "$comm"; done < <(ps -e -o pid= -o comm=) | sort -k 2nr
+[iostat] iotop -o -P -d 5
+[setfacl] setfacl -m u:ivan:rwx /opt/mydata
+[grep ip] grep -a -E '([0-9]{1,3}\.){3}[0-9]{1,3}' /var/log/nginx/access.log
+[proc env] sudo cat /proc/<pid>/environ | xargs -0 -n1
+[ansible get fact] ansible debian12-vpn -m setup -a 'filter=os_family,distribution_version'
+[ansible custom_vars] playbook.yml -e 'user_name=root' -e 'user_home=/root'
+[curl git] curl -fsSL https://raw.githubusercontent.com/user/dots/main/file.txt -o ~/test_file.txt
+[systemd status] "systemctl is-active --quiet cron
