@@ -53,10 +53,9 @@ Tmux is almost always available in the standard repositories, and many Linux [di
 Open the terminal and execute:
 
 ```bash
-sudo apt update && sudo apt install -y curl git xclip fzf tmux
+sudo apt update && sudo apt install -y git xclip fzf tmux
 ```
 
-- `curl`– utility for interaction with the web (needed for downloading the config);
 - `git`– version control system and utility of the same name for working with git [repositories](https://r4ven.me/it-razdel/slovarik/repozitorij-programmnogo-obespecheniya/) (needed for installing third-party plugins);
 - `xclip`– a clipboard management utility in Xorg [desktop](https://r4ven.me/it-razdel/slovarik/okruzhenie-rabochego-stola/) systems, usually pre-installed (if you are installing tmux on a system without a gui, you don’t need to install it);
 - `fzf` - fuzzy finder, required for the tmux-fzf plugin. It adds functionality for quickly launching long commands and creating SSH sessions in adjacent tmux panes;
@@ -64,7 +63,7 @@ sudo apt update && sudo apt install -y curl git xclip fzf tmux
 
 ## Downloading the config and running
 
-Now let's use the utility `curl`to download the Tmux configuration file from my [GitHub](https://github.com/r4ven-me/dots/blob/main/.config/tmux/tmux.conf) 😇 repository:
+Now let's use the utility `git`to download the Tmux configuration files from this GitHub 😇 repository:
 
 ```bash
 git clone https://github.com/r4ven-me/tmux.git ~/.config/tmux
@@ -139,7 +138,7 @@ Now you can connect to an existing session named **Work** using a single letter 
 
 **General settings📖:**
 
-- 256 colors support enabled: `screen-256color`;
+- 256 colors support enabled: `tmux-256color`;
 - TrueColor support is enabled for more accurate color display;
 - windows are numbered from 1, not 0 ( `base-index 1`);
 - panels in windows are also numbered starting from 1 ( `pane-base-index 1`);
