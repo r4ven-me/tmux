@@ -1,5 +1,5 @@
 [ps tree] ps -axf -eo user,pid,ppid,state,comm
-[ps zombie] ps -eo user,pid,ppid,state,comm | awk '\$4=="Z" {print \$3}'
+[ps zombie] ps -eo user,pid,ppid,state,comm | awk '$4=="Z" {print $3}'
 [ps parrent] ps -o pid,command --ppid 698"
 [ps top5 cpu] ps --sort=-%cpu -eo user,pid,ppid,state,comm | head -n6
 [ps top5 mem] ps --sort=-%mem -eo user,pid,ppid,state,comm | head -n6
@@ -7,7 +7,7 @@
 [ps systemd] systemd-cgls
 [cron add] { crontab -l; echo "0 3 * * 0 ls -l &> dirs.txt"; } | crontab -
 [du top20] du -h / 2> /dev/null | sort -rh | head -n 20
-[df 80] df -h | awk '\$5 ~ /^8[0-9]%/ {print \$6}'
+[df 80] df -h | awk '$5 ~ /^8[0-9]%/ {print $6}'
 [git init] git init --initial-branch=main && git config user.name "User Name" && git config --global user.email "user@example.com" && git remote add origin ssh://git@github.com/user/reponame.git
 [journal vacuum] journalctl --vacuum-size=800M
 [lsof opened] lsof +D /opt
@@ -16,15 +16,15 @@
 [ossl info] openssl x509 -in ./ca-cert.pem -text -noout
 [ossl encrypt tar] tar -czf - /var/log/apt | openssl enc -aes-256-cbc -pbkdf2 -e -out ./logs.tar.gz.enc
 [ossl decrypt file] openssl enc -aes-256-cbc -pbkdf2 -d -in ./logs.tar.gz.enc -out ./logs.tar.gz
-[ss listen] ss -tuln | awk '{print \$5}' | grep -Eo ':[0-9]+$' | sort -t: -k2 -n -u
+[ss listen] ss -tuln | awk '{print $5}' | grep -Eo ':[0-9]+$' | sort -t: -k2 -n -u
 [ipt recent icmp1] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --set --name PING_LIST
 [ipt recent icmp2] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --update --seconds 10 --hitcount 5 --name PING_LIST -j DROP
 [uptime unix] date -d "$(uptime -s)" +%s
-[history top10] history | awk '{print \$2}' | sort | uniq -c | sort -rn | head
+[history top10] history | awk '{print $2}' | sort | uniq -c | sort -rn | head
 [urandom str] cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1
 [sed replace] sed -i.bak 's/old_text/new_text/g' file.txt
-[find chmod d] find /path -type f -exec chmod 644 {} \\;
-[find chmod f] find /path -type d -exec chmod 755 {} \\;
+[find chmod d] find /path -type f -exec chmod 644 {} \;
+[find chmod f] find /path -type d -exec chmod 755 {} \;
 [tcpdump dhost_dport] tcpdump -i any -nn -q dst host 10.11.12.13 and dst port 443
 [tcpdump stout] sudo tcpdump -nn -i any host 10.11.12.13 >> ./tcpdump.txt
 [tcpdump wrtie pacp] sudo tcpdump -nn -i any host 10.11.12.13 -w ./tcpdump.pcap
@@ -43,7 +43,7 @@
 [ufw log] sudo dmesg -w | grep -i '\[UFW'
 [strace exec] strace -f -e execve ls -l
 [strace pid] strace -p <pid>
-[swap procs] for file in /proc/*/status ; do awk '/VmSwap|Name/{printf \$2 \" \" \$3}END{ print \"\"}' \$file; done | sort -k 2 -n -r | head -n 10
+[swap procs] for file in /proc/*/status ; do awk '/VmSwap|Name/{printf $2 " " $3}END{ print ""}' $file; done | sort -k 2 -n -r | head -n 10
 [swappiness] cat /proc/sys/vm/swappiness
 [system group] addgroup --system --gid 1999 username
 [system user] adduser --system --gecos 'Example service user' --disabled-password --uid 1999 --ingroup username --shell /sbin/nologin --home /opt/username/ username
@@ -60,4 +60,4 @@
 [ansible get fact] ansible debian12-vpn -m setup -a 'filter=os_family,distribution_version'
 [ansible custom_vars] playbook.yml -e 'user_name=root' -e 'user_home=/root'
 [curl git] curl -fsSL https://raw.githubusercontent.com/user/dots/main/file.txt -o ~/test_file.txt
-[systemd status] "systemctl is-active --quiet cron
+[systemd status] systemctl is-active --quiet cron
