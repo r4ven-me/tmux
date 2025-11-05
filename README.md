@@ -1,4 +1,4 @@
-![Tmux - installation and customization + Nord theme](https://r4ven.me/wp-content/uploads/2024/11/13-33-09_23-11-2024.resized2.png)
+![Tmux - installation and customization + Nord theme](https://r4ven.me/dots/tmux-ustanovka-i-kastomizaciya-nord-theme/cover.jpeg)
 
 - [Tmux – installation and customization + Nord theme](#tmux--installation-and-customization--nord-theme)
     - [Greetings!](#greetings)
@@ -91,9 +91,9 @@ It should look something like this:
 
 That's it 😃 the setup is complete! Now you can actively use:
 
-[![](https://r4ven.me/wp-content/uploads/2024/11/image-50-1500x845.png)](https://r4ven.me/wp-content/uploads/2024/11/image-50.png)
+![](https://r4ven.me/dots/tmux-ustanovka-i-kastomizaciya-nord-theme/attachments/r4ven-me-tmux-ustanovka-i-kastomizaciya-nord-theme-3.jpeg)
 
-> ![](https://r4ven.me/wp-content/uploads/2024/11/image-38.png)
+> ![](https://r4ven.me/images/vim.jpeg)
 > 
 > Liked my Neovim config? You can easily create a similar one according to the article: [Neovim – Installing and configuring a code editor with IDE elements in just a few commands](https://r4ven.me/it-razdel/poleznoe-po/neovim-ustanovka-i-nastrojka-redaktora-koda-s-elementami-ide-vsego-v-neskolko-komand/) .
 

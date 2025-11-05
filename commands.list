@@ -19,8 +19,9 @@
 [show swap usage processes] for file in /proc/*/status ; do awk '/VmSwap|Name/{printf $2 " " $3}END{ print ""}' $file; done | sort -k 2 -n -r | head -n 10
 [show swappiness value] cat /proc/sys/vm/swappiness
 [show OOM scores] printf "PID\tOOM Score\tOOM Adj\tCommand\n"; while read -r pid comm; do [ -f /proc/$pid/oom_score ] && [ $(cat /proc/$pid/oom_score) != 0 ] && printf "%d\t%d\t\t%d\t%s\n" "$pid" "$(cat /proc/$pid/oom_score)" "$(cat /proc/$pid/oom_score_adj)" "$comm"; done < <(ps -e -o pid= -o comm=) | sort -k 2nr
-[show iotop] iotop -o -P -d 5
-[grep IPs in log] grep -a -E '([0-9]{1,3}\.){3}[0-9]{1,3}' /var/log/nginx/access.log
+[iotop: show iotop] iotop -o -P -d 5
+[iostat: mon stat of cpu and devs] iostat -x 2
+[grep: grep IPs in log] grep -a -E '([0-9]{1,3}\.){3}[0-9]{1,3}' /var/log/nginx/access.log
 
 # LVM
 [list lv and snapshots] lvs --options lv_name,lv_size,origin,lv_attr
@@ -37,6 +38,9 @@
 [check port via curl] curl -v telnet://10.11.12.13:1234
 [check port via echo] echo > /dev/tcp/r4ven.me/443 && echo "open" || echo "unavailable"
 [check port via openssl] openssl s_client -connect r4ven.me:443
+[ip: up/down iface] sudo ip link set dev eth0 down; sudo ip link set dev eth0 up
+[sysctl: enable forwarding (temp)] sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1
+[sysctl: enable forwarding (perm)] echo -e 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1' > /etc/sysctl.d/99-forwarding.conf && sysctl -p /etc/sysctl.d/99-forwarding.conf
 
 # Packet Capture
 [capture dst host:port] tcpdump -i any -nn -q dst host 10.11.12.13 and dst port 443
@@ -48,13 +52,20 @@
 [encrypt tar with openssl] tar -czf - /var/log/apt | openssl enc -aes-256-cbc -pbkdf2 -e -out ./logs.tar.gz.enc
 [decrypt file with openssl] openssl enc -aes-256-cbc -pbkdf2 -d -in ./logs.tar.gz.enc -out ./logs.tar.gz
 [openssl connect] openssl s_client -connect r4ven.me:443
-[openssl show cert remote] openssl s_client -connect r4ven.com:443 < /dev/null 2> /dev/null | openssl x509 -text
+[openssl show cert remote] openssl s_client -connect r4ven.me:443 < /dev/null 2> /dev/null | openssl x509 -text
 [openssl show cert alt] openssl s_client -connect r4ven.me:443 -servername r4ven.me < /dev/null 2>/dev/null | openssl x509 -text
-[openssl show local cert] openssl x509 -in ./ca-cert.pem -text -noout
+[openssl show local cert] openssl x509 -in ./ca-cert.crt -text -noout
+[openssl: self-signed cert] openssl req -x509 -nodes -days 7300 -newkey rsa:4096 -keyout ./example.com.key -out ./example.crt -subj "/C=RU/ST=Moscow/L=Moscow/O=Example/OU=TEST/CN=example.com"
+[tls rhel: list tls orgs certs] openssl crl2pkcs7 -nocrl -certfile /etc/pki/tls/certs/ca-bundle.crt | openssl pkcs7 -print_certs -text | grep "Subject:"
+[tls deb: list tls orgs certs] openssl crl2pkcs7 -nocrl -certfile /etc/ssl/certs/ca-certificates.crt | openssl pkcs7 -print_certs -text | grep "Subject:"
+[tls rhel: add new cert] cp ./org_name.crt /etc/pki/ca-trust/source/anchors/org_name.crt | update-trust extract
+[tls deb: add new cert] cp ./org_name.crt /usr/local/share/ca-certificates/org_name.crt | update-ca-certificates
+[tls: list orgs] trust list | less
 [gpg encrypt file] gpg --batch --passphrase-file /path/to/password_file --symmetric --cipher-algo AES256 example.txt
 
 # DNS / Network Tools
 [dig default] dig r4ven.me +short +answer +identify
+[dig default] dig r4ven.me +short +trace
 [dig alt ns] dig @8.8.8.8 r4ven.me +short +answer +identify
 [nmap tcp port check] nmap 10.11.12.13 -p 22
 [nmap udp port check] nmap -sU 10.11.12.13 -p 53
@@ -88,9 +99,10 @@
 [helm: download chart files] helm pull gitea-charts/gitea --untar
 
 # Git
-[git init repo] git init --initial-branch=main && git remote add origin ssh://git@github.com/r4ven-me/reponame.git
-[git init with config] git init --initial-branch=main && git config user.name "Ivan Cherniy" && git config user.email "kar-kar@r4ven.me" && git remote add origin ssh://git@github.com/r4ven-me/reponame.git
-[git push changes] git add . && git commit -m 'upd' && git push
+[git: init repo] git init --initial-branch=main && git remote add origin ssh://git@github.com/r4ven-me/reponame.git
+[git: init with config] git init --initial-branch=main && git config user.name "Ivan Cherniy" && git config user.email "kar-kar@r4ven.me" && git remote add origin ssh://git@github.com/r4ven-me/reponame.git
+[git: push changes] git add . && git commit -m 'upd' && git push
+[git: git log visual] git log --pretty=format:"%h %ad | %s%d [%an]" --graph --date=short
 
 # File Management
 [replace text inplace] sed -i.bak 's/old_text/new_text/g' file.txt
@@ -100,8 +112,11 @@
 [set ACL for user] setfacl -m u:ivan:rwx /opt/mydata
 
 # Web
-[curl download file] curl -fsSL https://raw.githubusercontent.com/r4ven-me/dots/main/.zshrc -o ~/.zshrc
-[curl trace request] curl --trace-ascii trace.txt r4ven.me
+[curl: download file] curl -fsSL https://raw.githubusercontent.com/r4ven-me/dots/main/.zshrc -o ~/.zshrc
+[curl: trace request] curl --trace-ascii trace.txt r4ven.me
+[curl: list all domains] curl -s -L -v https://example.com 2>&1 | grep 'Connected to'
+[curl: telegream message] curl -s -X POST -H 'Content-Type: application/json' -d '{"chat_id": "'"$TG_CHAT_ID"'", "text": "'"${item}: $message"'", "parse_mode": "Markdown"}' "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage"
+[curl: telegram file] curl -s -X POST -F "chat_id=${TG_CHAT_ID}" -F "document=@${FILE_PATH}" -F "caption=${CAPTION_TEXT}" -F "parse_mode=Markdown" "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument"
 
 # Users and groups
 [system group add] addgroup --system --gid 1995 zabbix
@@ -116,9 +131,20 @@
 [systemd list cgroups] sudo systemd-cgls
 [systemd top] sudo systemd-cgtop -d 3
 
+# Debug CPU
+[perf: top] perf top
+[perf: summary] perf stat ./your_program
+[perf: record execution] perf record -g ./your_program
+[perf: record running proc] perf record -g -p $(pidof your_program)
+[perf: analyze] perf report ./perf.data
+
+# Debug DISK
+[dd: test write speed] sync; dd if=/dev/zero of=tempfile bs=1M count=1024; sync
+[dd: test read spped] sysctl -w vm.drop_caches=3 && dd if=tempfile of=/dev/null bs=1M count=1024
+
 # Sysrq
 [sysrq reboot] echo b > /proc/sysrq-trigger
-[sysrq help] echo h | sudo tee /proc/sysrq-trigger | grep 'sysrq: HELP' /var/log/kern.log
+[sysrq help] echo h > /proc/sysrq-trigger; grep 'sysrq: HELP' /var/log/kern.log
 
 # Ansible
 [ansible list inventory] ansible-inventory --list
@@ -148,6 +174,7 @@
 
 # Misc
 [generate urandom string] cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1
+[print term colors] for i in {0..255}; do printf "\e[38;5;%sm%03d " "$i" "$i"; (( (i + 1) % 16 == 0 )) && printf "\e[0m\n"; done; printf "\e[0m\n"
 
 # Zabbix
 [zabbix: ping host] zabbix_get -s 192.168.1.100 -p 10050 -k agent.ping 
