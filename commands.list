@@ -1,17 +1,23 @@
 # Process Management
-[show top 5 cpu processes] ps --sort=-%cpu -eo user,pid,ppid,state,comm | head -n6
-[show top 5 mem processes] ps --sort=-%mem -eo user,pid,ppid,state,comm | head -n6
-[show process tree] ps -axf -eo user,pid,ppid,state,comm
-[show zombie parents] ps -eo user,pid,ppid,state,comm | awk '$4=="Z" {print $3}'
-[show parent command] ps -o pid,command --ppid 698
-[show systemd cgroups] systemd-cgls
-[show tree hierarchy] pstree -p -t -n -C age
+[ps: top 5 cpu processes] ps --sort=-%cpu -eo user,pid,ppid,state,comm | head -n6
+[ps: top 5 mem processes] ps --sort=-%mem -eo user,pid,ppid,state,comm | head -n6
+[ps: process tree] ps -axf -eo user,pid,ppid,state,comm
+[ps: zombie parents] ps -eo user,pid,ppid,state,comm | awk 'NR==1 || $4=="Z"'
+[ps: parent command] ps -o pid,command --ppid 698
+[ps: systemd cgroups] systemd-cgls
+[ps: tree hierarchy] pstree -p -t -n -C age
 [list binaries of user processes] for pid in $(ps -u $USER -o pid); do exe=$(readlink -f /proc/$pid/exe 2>/dev/null); if [ "$exe" ]; then echo "$pid: $exe"; fi; done | awk '{print $2}' | sort -u
+[cgroup: show memory max] pid=$(systemctl show <service-name> -p MainPID --value); cgroup_path=$(grep '^0::' /proc/$pid/cgroup | cut -d: -f3); cat /sys/fs/cgroup${cgroup_path}/memory.max
+[cgroup: show memory max] pid=<PID>; cgroup_path=$(grep '^0::' /proc/$pid/cgroup | cut -d: -f3); cat /sys/fs/cgroup${cgroup_path}/cpu.max
+[ulimit: proc limits] cat /proc/<PID>/limits
+[find which device is busy] for pid in /proc/[0-9]*; do grep -q "/mount/path" "$pid/fd"/* 2> /dev/null && echo "PID: ${pid#/proc/}"; done
 
 # System Monitoring
+[top: batch mode] top -b -n 1 
 [cpu utilization] vmstat 1 2 | tail -1 | awk '{print 100 - $15 "%"}'
 [show mount points >80%] df -h | awk '$5 ~ /^8[0-9]%/ {print $6}'
-[show disk usage top20] du -h / 2> /dev/null | sort -rh | head -n 20
+[disk: show top20 usage] du -h / 2> /dev/null | sort -rh | head -n 20
+[disk: show top20 usage] du -x --block-size=1 / 2>/dev/null | sort -rn | head -n 20 | numfmt --to=iec
 [logs disk usage] journalctl --disk-usage
 [show open files in dir] lsof +D /opt
 [show uptime as unixtime] date -d "$(uptime -s)" +%s
@@ -22,6 +28,7 @@
 [iotop: show iotop] iotop -o -P -d 5
 [iostat: mon stat of cpu and devs] iostat -x 2
 [grep: grep IPs in log] grep -a -E '([0-9]{1,3}\.){3}[0-9]{1,3}' /var/log/nginx/access.log
+[sar: load avg] sar -q 1 5
 
 # LVM
 [list lv and snapshots] lvs --options lv_name,lv_size,origin,lv_attr
@@ -35,12 +42,100 @@
 [iptables track icmp] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --set --name PING_LIST
 [iptables limit icmp] iptables -A INPUT -p icmp --icmp-type echo-request -m recent --update --seconds 10 --hitcount 5 --name PING_LIST -j DROP
 [nftables replace rule] sudo nft replace rule inet filter input handle 23 'tcp dport 2222 accept comment "Allow SSH"'
+[nftables: show log] sudo journalctl -k -f -g 'NFT-DROP'
 [check port via curl] curl -v telnet://10.11.12.13:1234
 [check port via echo] echo > /dev/tcp/r4ven.me/443 && echo "open" || echo "unavailable"
 [check port via openssl] openssl s_client -connect r4ven.me:443
 [ip: up/down iface] sudo ip link set dev eth0 down; sudo ip link set dev eth0 up
 [sysctl: enable forwarding (temp)] sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1
 [sysctl: enable forwarding (perm)] echo -e 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1' > /etc/sysctl.d/99-forwarding.conf && sysctl -p /etc/sysctl.d/99-forwarding.conf
+[ping: parallel ping] seq 20 | xargs -P20 -I{} sh -c 'ping -c5 nftables.r4ven.me > out_{}.log 2>&1'
+[caps: cmd with some capabilities] sudo capsh --caps="cap_net_raw+ep" -- -c "/path/to/program"
+
+# Nftables
+[nft: basic rules] nft "flush ruleset"
+[nft: basic rules] nft "add table inet filter"
+[nft: basic rules] nft "flush table inet filter"
+[nft: basic rules] nft "add table inet nat"
+[nft: basic rules] nft "flush table inet nat"
+[nft: basic rules] nft "add set inet filter lan4 { type ipv4_addr; flags interval; elements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } }"
+[nft: basic rules] nft "add set inet filter lan6 { type ipv6_addr; flags interval; elements = { fd00::/8, fe80::/10 } }"
+[nft: basic rules] nft "add set inet filter trusted { type ipv4_addr; elements = { 123.34.56.78 } }"
+[nft: basic rules] nft "add chain inet filter input { type filter hook input priority 0; policy drop; }"
+[nft: basic rules] nft "add chain inet filter forward { type filter hook forward priority 50; policy drop; }"
+[nft: basic rules] nft "add chain inet filter output { type filter hook output priority -200; policy accept; }"
+[nft: basic rules] nft "add chain inet nat prerouting { type nat hook prerouting priority dstnat; policy accept; }"
+[nft: basic rules] nft "add chain inet nat postrouting { type nat hook postrouting priority srcnat; policy accept; }"
+[nft: basic rules] nft "add chain inet filter input_wan"
+[nft: basic rules] nft "add chain inet filter input_lan"
+[nft: basic rules] nft "add chain inet filter log_drop"
+[nft: basic rules] nft "add rule inet filter input ct state invalid drop comment \"Drop invalid connections\""
+[nft: basic rules] nft "add rule inet filter input ct state { established, related } accept comment \"Allow established connections\""
+[nft: basic rules] nft "add rule inet filter input iif lo accept comment \"Allow loopback\""
+[nft: basic rules] nft "add rule inet filter input ip saddr @trusted accept comment \"Allow trusted IPs\""
+[nft: basic rules] nft "add rule inet filter input meta l4proto icmp icmp type { echo-request, destination-unreachable, time-exceeded } limit rate 10/second accept comment \"ICMP rate limited\""
+[nft: basic rules] nft "add rule inet filter input meta l4proto ipv6-icmp icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld2-listener-report } accept comment \"Necessary IPv6 ICMP\""
+[nft: basic rules] nft "add rule inet filter input_wan udp dport 33434-33534 reject comment \"Allow UDP traceroute\""
+[nft: basic rules] nft "add rule inet filter input ip saddr @lan4 jump input_lan comment \"LAN IPv4 processing\""
+[nft: basic rules] nft "add rule inet filter input ip6 saddr @lan6 jump input_lan comment \"LAN IPv6 processing\""
+[nft: basic rules] nft "add rule inet filter input ip saddr != @lan4 jump input_wan comment \"WAN IPv4 processing\""
+[nft: basic rules] nft "add rule inet filter input ip6 saddr != @lan6 jump input_wan comment \"WAN IPv6 processing\""
+[nft: basic rules] nft "add rule inet filter input jump log_drop comment \"Default drop\""
+[nft: basic rules] nft "add rule inet filter input_lan meta l4proto { tcp, udp } accept comment \"Allow all TCP/UDP from LAN\""
+[nft: basic rules] nft "add rule inet filter input_lan tcp dport { 80, 443 } accept comment \"Allowed TCP ports from LAN\""
+[nft: basic rules] nft "add rule inet filter input_lan udp dport { 53, 123 } accept comment \"Allowed UDP ports from LAN\""
+[nft: basic rules] nft "add rule inet filter input_lan ct state new jump log_drop comment \"Drop all from LAN with log\""
+[nft: basic rules] nft "add rule inet filter input_wan tcp dport 22 accept comment \"Allow SSH from WAN\"" 
+[nft: basic rules] nft "add rule inet filter input_wan tcp dport { 80, 443 } accept comment \"Allowed TCP ports from WAN\""
+[nft: basic rules] nft "add rule inet filter input_wan udp dport { 53, 123 } accept comment \"Allowed UDP ports from WAN\""
+[nft: basic rules] nft "add rule inet filter input_wan iifname \"eth0\" tcp dport 443 accept comment \"DNAT: 443->43443\""
+[nft: basic rules] nft "add rule inet filter input_wan iifname \"eth0\" ct status dnat tcp dport 43443 accept comment \"DNAT: 443->43443\""
+[nft: basic rules] nft "add rule inet filter input_wan ct state new jump log_drop comment \"Drop all from WAN\""
+[nft: basic rules] nft "add rule inet filter forward ct state established,related accept"
+[nft: basic rules] nft "add rule inet filter forward iifname \"cni*\" accept comment \"Allow K8s forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"cni*\" accept comment \"Allow K8s forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"flannel.*\" accept comment \"Allow K8s forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"flannel.*\" accept comment \"Allow K8s forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"vxlan.calico\" accept comment \"Allow K8s forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"vxlan.calico\" accept comment \"Allow K8s forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"br-*\" accept comment \"Allow Docker forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"br-*\" accept comment \"Allow Docker forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"virbr*\" accept comment \"Allow VMs forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"virbr*\" accept comment \"Allow VMs forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"tun*\" accept comment \"Allow OC forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"tun*\" accept comment \"Allow OC forward out\""
+[nft: basic rules] nft "add rule inet filter forward iifname \"wg*\" accept comment \"Allow WG forward in\""
+[nft: basic rules] nft "add rule inet filter forward oifname \"wg*\" accept comment \"Allow WG forward out\""
+[nft: basic rules] nft "add rule inet filter forward ct state new jump log_drop comment \"Drop all forward\""
+[nft: basic rules] nft "add rule inet filter log_drop limit rate 5/second log prefix \"NFT-DROP: \" flags all counter comment \"Drop logging\""
+[nft: basic rules] nft "add rule inet filter input meta l4proto tcp reject with tcp reset comment \"Reject TCP\""
+[nft: basic rules] nft "add rule inet filter input meta l4proto udp reject comment \"Reject UDP\""
+[nft: basic rules] nft "add rule inet filter input counter reject with icmpx type port-unreachable comment \"Reject other protocols\""
+[nft: basic rules] nft "add rule inet filter input pkttype host limit rate 5/second counter reject with icmpx type admin-prohibited comment \"Protection from port scanning\""
+[nft: basic rules] nft "add rule inet filter log_drop drop comment \"Drop all\""
+[nft: basic rules] nft "add rule inet nat prerouting iifname \"eth0\" tcp dport 443 redirect to 43443 comment \"DNAT: 443->43443\""
+[nft: basic rules] nft "add rule inet nat prerouting iifname \"eth0\" tcp dport 443 dnat to :43443 comment \"DNAT:  443->43443 \""
+[nft: basic rules] nft "add rule inet nat postrouting oifname != lo masquerade comment \"SNAT: NAT processing for all\""
+[nft: basic rules] nft "add rule inet nat postrouting oifname \"eth0\" masquerade comment \"SNAT: NAT procesing for eth0\""
+[nft: basic rules] nft "add rule inet nat postrouting oifname \"tun*\" masquerade comment \"SNAT: NAT procesing for OC\""
+[nft: commands] nft list ruleset
+[nft: commands] nft list tables
+[nft: commands] nft list table inet filter
+[nft: commands] nft list chain inet filter input
+[nft: commands] nft -a list ruleset
+[nft: commands] nft flush ruleset
+[nft: commands] nft flush table inet filter
+[nft: commands] nft delete table inet filter
+[nft: commands] nft add rule inet filter input tcp dport 22 accept
+[nft: commands] nft -a list chain inet filter input
+[nft: commands] nft delete rule inet filter input handle 15
+[nft: commands] nft replace rule inet filter input handle 15 tcp dport 2222 accept
+[nft: commands] nft -f /etc/nftables.conf
+[nft: commands] nft -c -f /etc/nftables.conf
+[nft: commands] nft -s list ruleset > /etc/nftables.conf
+[nft: commands] nft monitor
+[nft: commands] nft monitor trace
+[nft: commands] nft --debug=netlink -f myrules.nft
 
 # Packet Capture
 [capture dst host:port] tcpdump -i any -nn -q dst host 10.11.12.13 and dst port 443
@@ -56,6 +151,9 @@
 [openssl show cert alt] openssl s_client -connect r4ven.me:443 -servername r4ven.me < /dev/null 2>/dev/null | openssl x509 -text
 [openssl show local cert] openssl x509 -in ./ca-cert.crt -text -noout
 [openssl: self-signed cert] openssl req -x509 -nodes -days 7300 -newkey rsa:4096 -keyout ./example.com.key -out ./example.crt -subj "/C=RU/ST=Moscow/L=Moscow/O=Example/OU=TEST/CN=example.com"
+[openssl: md5 of cert] openssl x509 -noout -modulus -in /var/lib/kubelet/pki/kubelet.crt | openssl md5
+[openssl: md5 of key] openssl rsa -noout -modulus -in /var/lib/kubelet/pki/kubelet.key | openssl md5
+[mkcert: local tls certs] mkcert -cert-file jenkins.local.pem -key-file jenkins.local-key.pem "jenkins.local" "localhost" "127.0.0.1"
 [tls rhel: list tls orgs certs] openssl crl2pkcs7 -nocrl -certfile /etc/pki/tls/certs/ca-bundle.crt | openssl pkcs7 -print_certs -text | grep "Subject:"
 [tls deb: list tls orgs certs] openssl crl2pkcs7 -nocrl -certfile /etc/ssl/certs/ca-certificates.crt | openssl pkcs7 -print_certs -text | grep "Subject:"
 [tls rhel: add new cert] cp ./org_name.crt /etc/pki/ca-trust/source/anchors/org_name.crt | update-trust extract
@@ -78,6 +176,7 @@
 [socat: tcp server] socat -v TCP-LISTEN:9999,fork SYSTEM:"echo 'pong'"
 [socat: udp client] echo "ping" | socat - UDP:127.0.0.1:9999
 [socat: tcp client] echo "ping" | socat - TCP:127.0.0.1:9999
+[ncat: web page with autorefresh] ncat -lk 8080 -c 'echo -e "HTTP/1.1 200 OK\nContent-Type: text/html\n\n<html><meta http-equiv=\"refresh\" content=\"1\"><pre>$(date)\nONLINE</pre></html>"'
 
 # Docker
 [docker network create] docker network create --opt com.docker.network.bridge.name=br-monitoring --opt com.docker.network.enable_ipv6=false --driver bridge --subnet 172.22.22.0/24 --gateway 172.22.22.1 monitoring_network
@@ -85,6 +184,7 @@
 [docker build image] docker build -t r4venme/test .
 [docker build multiarch] docker buildx create --use && docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t r4venme/test:1.0 ./
 [docker multitool container] docker run --rm -it --network=container:test --pid container:test wbitt/network-multitool:alpine-extra bash
+[docker: dive image] docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock wagoodman/dive:latest nginx:1.29
 
 # Kubernetes
 [k8s: get objects] kubectl -n name_space get pods,svc,pvc,sts,pv -o wide
@@ -103,13 +203,89 @@
 [git: init with config] git init --initial-branch=main && git config user.name "Ivan Cherniy" && git config user.email "kar-kar@r4ven.me" && git remote add origin ssh://git@github.com/r4ven-me/reponame.git
 [git: push changes] git add . && git commit -m 'upd' && git push
 [git: git log visual] git log --pretty=format:"%h %ad | %s%d [%an]" --graph --date=short
+[git: create keep files] find /path/to/repo/ -type d -empty -exec touch {}/.gitkeep \;
 
 # File Management
-[replace text inplace] sed -i.bak 's/old_text/new_text/g' file.txt
+[sed: replace text] sed -i.bkp 's/old_text/new_text/g' ./file.txt
+[sed: insert first line] sed -i.bkp '1i test_line' ./file.txt
+[sed: insert first block] sed -i.bkp '1i test_line:\n    value1\n    value2' ./file.txt
+[sed: change substring] sed '\|^test_line|s|line|word|'
 [find and chmod files] find /path -type f -exec chmod 644 {} \;
 [find and chmod dirs] find /path -type d -exec chmod 755 {} \;
 [find with exclude path] find ./ -path ./subpath -prune -o -name 'index.md' -ls
 [set ACL for user] setfacl -m u:ivan:rwx /opt/mydata
+[find all symlinks] current="/path/to/symlinks"; while [[ -L "$current" ]]; do target=$(readlink "$current"); echo "$current -> $target"; if [[ "$target" == /* ]]; then current="$target"; else current="$(dirname "$current")/$target"; fi; done; echo "Final: $current"
+[dd: create files with data] dd if=/dev/urandom of=./file1 bs=50K count=10
+[dd: create files with data] dd if=/dev/urandom of=./file2 bs=50K count=10
+[tar: create archive] tar -c -f ./archive.tar ./file1 ./file2 ./dir/
+[tar: create archive with verbose output] tar -v -c -f ./archive.tar ./file1 ./file2 ./dir/
+[tar: create from different directory] tar -C /tmp/dir/ -c -f ./archive.tar ./
+[tar: extract archive] tar -x -f ./archive.tar
+[tar: extract to specific directory] tar -C /tmp/dir/ -x -f ./archive.tar
+[tar: list archive contents] tar -t -f ./archive.tar
+[tar: verify archive integrity] tar -t -f ./archive.tar &> /dev/null
+[tar: add file to archive] tar -r -f ./archive.tar /etc/passwd
+[tar: delete file from archive] tar --delete -f archive.tar etc/passwd
+[tar: gzip compression] tar -c -z -f ./archive.tar.gz ./file1 ./file2
+[tar: bzip2 compression] tar -c -j -f archive.tar.bz2 ./file1.txt ./file2.txt
+[tar: xz compression] tar -c -J -f archive.tar.xz ./file1.txt ./file2.txt
+[tar: zstd compression] tar -c --zstd -f archive.tar.zst ./file1.txt ./file2.txt
+[tar: create test archive with zstd] tar -I "zstd -19" -cvf ./archive.tzst ./file* ./dir
+[tar: compression with custom utility] tar -v -I "zstd -19" -c -f ./archive.tzst ./file1.txt ./dir
+[tar: create archive to stdout] tar -c -f - ./file1 ./file2 ./dir/ > ./archive.tar
+[tar: create compressed archive to stdout] tar -c -z -f - ./file1 ./file2 ./dir/ > ./archive.tgz
+[tar: pipe to external compressor] tar -c -f - ./file1 ./file2 ./dir/ | gzip -9 > ./archive.tgz
+[tar: archive files found by find] find ./ -name 'file[1-2]' | tar -c -z -f ./archive.tgz -T -
+[tar: send archive to remote host] tar -c -z -f - ./dir/ | ssh ivan@test.r4ven.me "tar -C /tmp -x -z -f -"
+[tar: create archive on remote host] ssh ivan@test.r4ven.me "tar -c -z -f - ./file1 ./file2" > ./archive.tgz
+[tar: extract remote archive locally] ssh ivan@test.r4ven.me "cat ./archive.tgz" | tar -C /tmp -x -z -f -
+[tar: create encrypted archive] tar -c -z -f - ./file1 ./file2 ./dir/ | gpg --batch --symmetric --passphrase "MyPassword" > ./archive.tgz.gpg
+[gpg: decrypt and extract archive] gpg -d ./archive.tgz.gpg | tar -x -z -f -
+[tar: split archive into parts] tar -c -z -f - ./dir/ | split -b 200K - ./archive.tgz.part-
+[cat: combine split archives] cat ./archive.tgz.part-* | tar -x -z -f -
+[gzip: compress file] gzip ./file1.txt
+[gzip: decompress file] gunzip ./file1.txt.gz
+[gzip: decompress file] gzip -d ./file1.txt.gz
+[gzip: compress keeping original] gzip -k ./file1.txt
+[gzip: maximum compression] gzip -9 ./file1.txt
+[bzip2: compress file] bzip2 ./file1.txt
+[bzip2: decompress file] bunzip2 ./file1.txt.bz2
+[bzip2: decompress file] bzip2 -d ./file1.txt.bz2
+[bzip2: compress keeping original] bzip2 -k ./file1.txt
+[bzip2: maximum compression] bzip2 -9 ./file1.txt
+[xz: compress file] xz ./file1.txt
+[xz: decompress file] unxz ./file1.txt.xz
+[xz: decompress file] xz -d ./file1.txt.xz
+[xz: compress keeping original] xz -k ./file1.txt
+[xz: maximum compression] xz -9 ./file1.txt
+[zstd: compress file] zstd ./file1.txt
+[zstd: compress keeping original] zstd -k ./file1.txt
+[zstd: decompress file] unzstd ./file1.txt.zst
+[zstd: decompress file] zstd -d ./file1.txt.zst
+[zstd: maximum compression] zstd -19 ./file1.txt
+[zip: create archive] zip ./archive.zip ./file1 ./dir/
+[unzip: extract archive] unzip ./archive.zip
+[unzip: list archive contents] unzip -l ./archive.zip
+[zip: add file to archive] zip ./archive.zip ./file2
+[zip: no compression] zip -0 ./archive.zip ./file1.txt
+[zip: maximum compression] zip -9 ./archive.zip ./file1.txt
+[7z: create archive] 7z a ./archive.7z ./file1 ./dir/
+[7z: extract archive] 7z x ./archive.7z
+[7z: list archive contents] 7z l ./archive.7z
+[7z: add file to archive] 7z a ./archive.7z ./file2
+[7z: no compression] 7z a -mx=0 archive.7z ./file1.txt
+[7z: maximum compression] 7z a -mx=9 archive.7z ./file1.txt
+[rar: create archive] rar a ./archive.rar ./file1 ./dir/
+[unrar: extract archive] unrar x ./archive.rar
+[unrar: list archive contents] unrar l ./archive.rar
+[rar: add file to archive] rar a ./archive.rar ./file2
+[rar: no compression] rar a -m0 ./archive.rar file1.txt
+[rar: maximum compression] rar a -m5 archive.rar file1.txt
+[zip: create test archive] zip -9 ./archive.zip ./file* ./dir
+[7z: create test archive] 7z a -mx=9 archive.7z ./file* ./dir
+[rar: create test archive] rar a -m5 ./archive.rar ./file* ./dir
+[lsof: find deleted files] lsof | grep '(deleted)'
+[truncate: truncate deleted files] truncate -s 0 /proc/<PID>/fd/<FD>
 
 # Web
 [curl: download file] curl -fsSL https://raw.githubusercontent.com/r4ven-me/dots/main/.zshrc -o ~/.zshrc
@@ -117,19 +293,22 @@
 [curl: list all domains] curl -s -L -v https://example.com 2>&1 | grep 'Connected to'
 [curl: telegream message] curl -s -X POST -H 'Content-Type: application/json' -d '{"chat_id": "'"$TG_CHAT_ID"'", "text": "'"${item}: $message"'", "parse_mode": "Markdown"}' "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage"
 [curl: telegram file] curl -s -X POST -F "chat_id=${TG_CHAT_ID}" -F "document=@${FILE_PATH}" -F "caption=${CAPTION_TEXT}" -F "parse_mode=Markdown" "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument"
+[curl: jenkins git generic webhook] curl -L -X POST -H "Content-Type: application/json" -d '{"ref":"refs/heads/main","repository":{"full_name":"test/repo"}}' "http://jenkins.example.com/generic-webhook-trigger/invoke?token=12345qwerty"
 
 # Users and groups
 [system group add] addgroup --system --gid 1995 zabbix
 [system user add] adduser --system --gecos 'Zabbix monitoring system' --disabled-password --uid 1997 --ingroup zabbix --shell /sbin/nologin --home /opt/zabbix/zabbix_data zabbix
 
 # Systemd
-[systemd edit unit] systemctl edit --full --force unitname.service
-[systemd show slice] systemctl show system.slice
-[systemd show unit params] systemctl show unit_name
-[systemd status check] systemctl is-active --quiet cron
-[systemd debug restart] sudo SYSTEMD_LOG_LEVEL=debug systemctl restart systemd-networkd
-[systemd list cgroups] sudo systemd-cgls
-[systemd top] sudo systemd-cgtop -d 3
+[systemd: edit unit] systemctl edit --full --force unitname.service
+[systemd: show slice] systemctl show system.slice
+[systemd: show unit params] systemctl show unit_name
+[systemd: status check] systemctl is-active --quiet cron
+[systemd: debug restart] sudo SYSTEMD_LOG_LEVEL=debug systemctl restart systemd-networkd
+[systemd: list cgroups] sudo systemd-cgls
+[systemd: show memory limit] systemctl show unitname.service -p MemoryMax
+[systemd: set limit] systemctl set-property unitname.service MemoryMax=2G
+[systemd: top] sudo systemd-cgtop -d 3
 
 # Debug CPU
 [perf: top] perf top
@@ -161,23 +340,117 @@
 [strace attach pid] strace -p 123
 [show process env] sudo cat /proc/<pid>/environ | xargs -0 -n1
 
+# Hardware
+[make cpu online] echo 1 > /sys/devices/system/cpu/cpu2/online
+
 # Logging
 [logging all output] exec > >(tee >(logger -t $(basename "${BASH_SOURCE[0]}")) | while IFS= read -r line; do echo "$(date +"[%Y-%m-%d %H:%M:%S.%3N]") - $line"; done | tee -a "${BASH_SOURCE[0]%.*}.log") 2>&1
 
 # SSH
+[ssh: create key quietly] ssh-keygen -q -N "" -t ed25519 -f ~/.ssh/id_ed25519_test
+[ssh: change key comment] ssh-keygen -c -f ~/.ssh/id_ed25519_test
 [ssh: show pub key] ssh-keygen -y -f ~/.ssh/id_ed25519
 [ssh: copy pub key to remote host] ssh-copy-id -i ~/.ssh/id_ed25519 user@host
-[port forwarding] ssh -q -f -N -L 127.0.0.1:5432:localhost:5432 ivan@test.r4ven.me
-[port forwarding temp] ssh -q -f -L 127.0.0.1:5432:localhost:5432 ivan@test.r4ven.me sleep 60
-[port forwarding temp full] ssh -q -f -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ExitOnForwardFailure=yes -L 127.0.0.1:5432:localhost:5432 test.r4ven.me -p 2222 -l ivan -i ~/.ssh/id_ed25519_test sleep 60
-[reverse port forwarding] ssh -q -f -N -R 127.0.0.1:4443:localhost:5001 ivan@test.r4ven.me
+[ssh: port forwarding] ssh -q -f -N -L 127.0.0.1:5432:localhost:5432 ivan@test.r4ven.me
+[ssh: port forwarding temp] ssh -q -f -L 127.0.0.1:5432:localhost:5432 ivan@test.r4ven.me sleep 60
+[ssh: port forwarding temp full] ssh -q -f -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ExitOnForwardFailure=yes -L 127.0.0.1:5432:localhost:5432 test.r4ven.me -p 2222 -l ivan -i ~/.ssh/id_ed25519_test sleep 60
+[ssh: reverse port forwarding] ssh -q -f -N -R 127.0.0.1:4443:localhost:5001 ivan@test.r4ven.me
+[ssh: remove host from known] ssh-keygen -f ~/.ssh/known_hosts -R 192.168.1.31
+[ssh: rsync] rsync --archive --compress --links --hard-links --xattrs --human-readable --delete -e "ssh -q -o StrictHostKeyChecking=no  -o UserKnownHostsFile=/dev/null -p 2222 -l test" "/path/to/local/source" r4ven.me:"/path/to/remote/destination/"
 
 # Misc
 [generate urandom string] cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1
-[print term colors] for i in {0..255}; do printf "\e[38;5;%sm%03d " "$i" "$i"; (( (i + 1) % 16 == 0 )) && printf "\e[0m\n"; done; printf "\e[0m\n"
+[print term fg colors] for i in {0..255}; do printf "\e[38;5;%sm%03d " "$i" "$i"; (( (i + 1) % 16 == 0 )) && printf "\e[0m\n"; done; printf "\e[0m\n"
+[print term bg colors] for i in {0..255}; do printf "\e[48;5;${i}m %03d \e[0m" $i; [ $((($i+1)%8)) -eq 0 ] && echo; done
+[history: only commands] history | cut -c 26-
 
 # Zabbix
 [zabbix: ping host] zabbix_get -s 192.168.1.100 -p 10050 -k agent.ping 
+
+# MongoDB
+[mongo: get replica set status] mongo -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval "rs.status()"
+[mongo: get count of primary nodes] mongo --quiet -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval "rs.status().members.filter(m => m.stateStr === 'PRIMARY').length"
+[mongo: get count of secondary nodes] mongo --quiet -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval "rs.status().members.filter(m => m.stateStr === 'SECONDARY').length"
+[mongo: get count of unhealthy nodes] mongo --quiet -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval "rs.status().members.filter(m => m.health !== 1).length"
+[mongo: check connection] mongo --quiet -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval "rs.status().ok"
+[mongo: check deley greater than 30 sec] mongo --quiet -u root -p "$(awk -F'"' '/auth/ {print $4}' "$MONGO_SHELL")" --eval 'var s = rs.status(); var p = s.members.find(m=>m.stateStr==="PRIMARY").optimeDate; var bad = s.members.filter(m => m.stateStr==="SECONDARY" && Math.abs(p - m.optimeDate) > 30000).length; print(bad);'
+
+# Dots
+[zsh: download .zshrc] curl -fsSL https://raw.githubusercontent.com/r4ven-me/dots/main/.zshrc --output /tmp/.zshrc
+
+# QEMU/KVM
+[qcow2: install tools] apt install -y qemu-utils libguestfs-tools
+[qcow2: download image] wcurl https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2
+[qcow2: resize image] qemu-img resize ./debian-13-generic-amd64.qcow2 20G
+[qcow2: customize image] virt-customize -a debian-13-generic-amd64.qcow2 --update --install qemu-guest-agent,locales,zsh,git,curl,neovim,bat,eza,fzf,grc --run-command "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen" --run-command "echo 'ru_RU.UTF-8 UTF-8' >> /etc/locale.gen" --run-command "locale-gen"
+[qcow2: set permissions] chmod 640 /tmp/.zshrc && chown root: /tmp/.zshrc
+[qcow2: copy file to root] virt-copy-in -a ./debian-13-generic-amd64.qcow2 /host/path /guest/path
+[qcow2: edit file] virt-edit -a ./debian-13-generic-amd64.qcow2 /guest/path
+[qcow2: mount image] guestmount -i -a ./debian-13-generic-amd64.qcow2 /mnt/qcow2
+[qcow2: unmount image] guestunmount /mnt/qcow2
+[qcow2: start interactive shell] guestfish -i -a ./debian-13-generic-amd64.qcow2
+[qcow2: run command inside image] sh 'grep root /etc/passwd'
+[qcow2: list directory contents] virt-ls -a ./debian-13-generic-amd64.qcow2 /path
+[qcow2: view file content] virt-cat -a ./debian-13-generic-amd64.qcow2 /path/to/file
+[qcow2: edit file inside image] virt-edit -a ./debian-13-generic-amd64.qcow2 /path/to/file
+[qcow2: copy from host to image] virt-copy-in -a ./debian-13-generic-amd64.qcow2 /host/path /guest/path
+[qcow2: copy from image to host] virt-copy-out -a ./debian-13-generic-amd64.qcow2 /guest/path /host/path
+[qcow2: archive image content] virt-tar-out -a ./debian-13-generic-amd64.qcow2 /path /host/archive.tar
+[qcow2: extract tar into image] virt-tar-in -a ./debian-13-generic-amd64.qcow2 ./archive.tar /guest/path
+[qcow2: show filesystems] virt-filesystems -a ./debian-13-generic-amd64.qcow2
+[qcow2: extract kernel] virt-get-kernel -a ./debian-13-generic-amd64.qcow2
+[qcow2: read system logs] virt-log -a ./debian-13-generic-amd64.qcow2
+[qcow2: inspect OS] virt-inspector -a ./debian-13-generic-amd64.qcow2
+[qcow2: show disk usage] virt-df -a ./debian-13-generic-amd64.qcow2
+[qcow2: build VM image] virt-builder <os-name>
+[qcow2: manage builder repo] virt-builder-repository
+[qcow2: customize image (example)] virt-customize -a ./debian-13-generic-amd64.qcow2 --install vim --ssh-inject root:file:id_rsa.pub
+[qcow2: seal image] virt-sysprep -a ./debian-13-generic-amd64.qcow2
+[qcow2: sparsify image] virt-sparsify ./debian-13-generic-amd64.qcow2 <out.qcow2>
+[qcow2: resize partitions] virt-resize --expand /dev/sda1 in.qcow2 out.qcow2
+
+# QEMU / KVM
+[qm: 1-install required tools] apt update && apt install -y libguestfs-tools
+[qm: 2-download Deb13 qcow2 image] wcurl https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2
+[qm: 3-resize image] qemu-img resize ./debian-13-generic-amd64.qcow2 20G
+[qm: 3-create VM] qm create 7777 --name "debian13-k8s-template" --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
+[qm: 4-import disk] qm importdisk 7777 ./debian-13-generic-amd64.qcow2 storage --format qcow2
+[qm: 5-attach SCSI disk] qm set 7777 --scsihw virtio-scsi-single --scsi0 storage:7777/vm-7777-disk-0.qcow2
+[qm: 6-set boot order] qm set 7777 --boot order=scsi0
+[qm: 7-add cloud-init disk] qm set 7777 --ide0 storage:cloudinit
+[qm: 8-enable serial console] qm set 7777 --serial0 socket --vga serial0
+[qm: 9-enable guest agent] qm set 7777 --agent enabled=1
+[qm: 10-convert to template] qm template 7777
+[qm: 11-rescan VM] qm rescan --vmid 7777
+[qm: 12-show config] qm config 7777
+
+# Proxmox
+[pveum: add role] pveum role add TFUser -privs "Pool.Allocate VM.Console VM.Allocate VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Datastore.AllocateSpace Datastore.Allocate Datastore.Audit SDN.Use"
+[pveum: add user] pveum user add tfuser@pve
+[pveum: assign role to puser] pveum aclmod / -user tfuser@pve -role TFUser
+[pveum: create API token] pveum user token add tfuser@pve tf --privsep 0
+
+# OpenTofu / Terraform
+[tofu: init workdir with upgrade] tofu init -upgrade
+[tofu: validate config] tofu validate
+[tofu: reconfigure backend] tofu init -reconfigure -backend-config="path=./dev.tfstate"
+[tofu: plan] tofu plan -var-file=./dev.tfvars
+[tofu: plan and planfile] tofu plan -var-file=./dev.tfvars -out ./dev.tfplan
+[tofu: apply] tofu apply -var-file=./dev.tfvars
+[tofu: apply with parallelism] tofu apply -var-file=./dev.tfvars -parallelism=2
+[tofu: destroy] tofu destroy -var-file=./dev.tfvars
+[tofu: check format] tofu fmt -check
+[tofu: format] tofu fmt
+[tofu: format recursively] tofu fmt -recursive
+[tofu: enable debug logging] export TF_LOG="DEBUG"
+[tofu: set log path] export TF_LOG_PATH="tofu.log"
+[tofu: follow log] tail -f ./tofu.log
+[tofu: disable logging] unset TF_LOG TF_LOG_PATH
+
+# SQL
+[psql: create .pgpass] echo 'localhost:5432:mydb:myuser:mypassword' > ~/.pgpass && chmod 0600 ~/.pgpass
+[psql: enter psql] sudo -u postgres psql -U postgres
+[psql: set user password] ALTER USER postgres WITH PASSWORD 'your_new_password'\;
 
 # Test Commands
 [test command 1] echo test1
